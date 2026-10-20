@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Шахматы (Chess Hotseat & AI Bot)</title>
+    <style>
+        :root {
+            --bg-page: #1a1917;
+            --bg-panel: #262421;
+            --bg-panel-secondary: #312e2b;
+            --border-color: #3f3b37;
+            --light-square: #f0d9b5;
+            --dark-square: #b58863;
+            --selected-square: #baca44;
+            --last-move-light: #f7ec74;
+            --last-move-dark: #dac343;
+            --check-color: #e04444;
+            --text-primary: #f0f0f0;
+            --text-secondary: #a39e93;
+            --text-accent: #81b64c;
+            --btn-primary: #81b64c;
+            --btn-primary-hover: #a3d160;
+            --btn-secondary: #45423e;
+            --btn-secondary-hover: #58544f;
+            --radius-md: 8px;
+            --radius-sm: 4px;
+            --board-size: min(90vw, 76vh, 520px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 12px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Главный контейнер */
+        .app-container {
+            width: 100%;
+            max-width: 980px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            align-items: center;
+        }
+
+        /* Заголовок */
+        header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2px 8px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .logo-icon {
+            font-size: 1.6rem;
+            color: var(--text-accent);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tool-btn {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: var(--radius-sm);
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        .tool-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-panel-secondary);
+        }
+
+        /* Основной блок: Доска + Боковая панель */
+        .game-layout {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 20px;
+            width: 100%;
+        }
+
+        /* Секция доски */
+        .board-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Полоса игроков */
+        .player-bar {
+            width: var(--board-size);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 7px 12px;
+            background: var(--bg-panel);
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .player-bar.active-turn {
+            border-color: var(--text-accent);
+            background: #2a2c26;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .player-badge {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 1px solid rgba(0, 0, 0, 0.4);
+            flex-shrink: 0;
+        }
+
+        .player-badge.white {
+            background: #ffffff;
+            box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+        }
+
+        .player-badge.black {
+            background: #2b2b2b;
+            border-color: #888;
+        }
+
+        .player-role-tag {
+            font-size: 0.72rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .captured-pieces {
+            display: flex;
+            gap: 2px;
+            font-size: 1.15rem;
+            min-height: 1.3rem;
+            align-items: center;
+            color: var(--text-secondary);
+        }
+
+        /* Шахматная доска */
+        .chessboard {
+            width: var(--board-size);
+            height: var(--board-size);
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+            position: relative;
+            background-color: var(--dark-square);
+        }
+
+        .chessboard.thinking {
+            cursor: wait;
+        }
+
+        /* Клетки */
+        .square {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.12s ease;
+        }
+
+        .square.light {
+            background-color: var(--light-square);
+            color: var(--dark-square);
+        }
+
+        .square.dark {
+            background-color: var(--dark-square);
+            color: var(--light-square);
+        }
+
+        /* Подсветка хода */
+        .square.selected {
+            background-color: var(--selected-square) !important;
+        }
+
+        .square.last-move.light {
+            background-color: var(--last-move-light) !important;
+        }
+
+        .square.last-move.dark {
+            background-color: var(--last-move-dark) !important;
+        }
+
+        .square.check {
+            background-color: var(--check-color) !important;
+            animation: pulseCheck 1s infinite alternate;
+        }
+
+        @keyframes pulseCheck {
+            0% { background-color: var(--check-color); }
+            100% { background-color: #b01b1b; }
+        }
+
+        /* Точки для возможных ходов */
+        .square.valid-move::after {
+            content: "";
+            position: absolute;
+            width: 26%;
+            height: 26%;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.25);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .square.light.valid-move::after {
+            background-color: rgba(0, 0, 0, 0.22);
+        }
+
+        /* Взятие фигуры */
+        .square.valid-capture::after {
+            content: "";
+            position: absolute;
+            width: 82%;
+            height: 82%;
+            border-radius: 50%;
+            border: 5px solid rgba(0, 0, 0, 0.28);
+            background-color: transparent;
+            pointer-events: none;
+            z-index: 2;
+            box-sizing: border-box;
+        }
+
+        /* Нотация координат внутри клеток */
+        .coord-rank {
+            position: absolute;
+            top: 2px;
+            left: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            pointer-events: none;
+            opacity: 0.85;
+        }
+
+        .coord-file {
+            position: absolute;
+            bottom: 2px;
+            right: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            pointer-events: none;
+            opacity: 0.85;
+        }
+
+        /* Фигуры */
+        .piece {
+            font-family: "Segoe UI Symbol", "Apple Symbols", "DejaVu Sans", "Arial Unicode MS", sans-serif;
+            font-size: clamp(28px, 6.6vw, 50px);
+            line-height: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+            cursor: grab;
+            transition: transform 0.1s ease;
+        }
+
+        .piece:active {
+            cursor: grabbing;
+        }
+
+        .piece.white-piece {
+            color: #ffffff;
+            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 1px #000000);
+        }
+
+        .piece.black-piece {
+            color: #1a1a1a;
+            filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.65));
+        }
+
+        /* Боковая панель */
+        .side-panel {
+            width: 330px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: var(--bg-panel);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Настройки режима и бота */
+        .settings-card {
+            background: var(--bg-panel-secondary);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .settings-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .settings-label {
+            font-size: 0.74rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .segmented-control {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: var(--radius-sm);
+            padding: 3px;
+            gap: 3px;
+        }
+
+        .seg-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 6px 4px;
+            font-size: 0.83rem;
+            font-weight: 600;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .seg-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .seg-btn.active {
+            background: var(--btn-primary);
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Карточка статуса */
+        .status-card {
+            background: var(--bg-panel-secondary);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            border-left: 4px solid var(--text-accent);
+        }
+
+        .status-title {
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        .status-message {
+            font-size: 1.12rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .bot-thinking-spinner {
+            display: inline-block;
+            animation: spin 1s infinite linear;
+            font-size: 1.1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Кнопки управления */
+        .actions-bar {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 11px 12px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background-color 0.15s, transform 0.08s;
+            touch-action: manipulation;
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary {
+            background-color: var(--btn-primary);
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--btn-primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--btn-secondary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--btn-secondary-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* История ходов */
+        .history-card {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-panel-secondary);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            flex: 1;
+            min-height: 160px;
+            max-height: 240px;
+        }
+
+        .history-header {
+            padding: 7px 12px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .history-list {
+            padding: 6px 12px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.88rem;
+        }
+
+        .history-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .history-list::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        .history-row {
+            display: grid;
+            grid-template-columns: 28px 1fr 1fr;
+            padding: 3px 6px;
+            border-radius: 3px;
+            align-items: center;
+        }
+
+        .history-row:nth-child(even) {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .history-num {
+            color: var(--text-secondary);
+        }
+
+        .history-move {
+            font-weight: 600;
+        }
+
+        .history-move.empty {
+            color: var(--text-secondary);
+        }
+
+        .history-empty {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 20px 0;
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
+        /* Модальные окна */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 16px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+            animation: popIn 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .promotion-choices {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .promo-btn {
+            background: var(--bg-panel-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 10px 0;
+            font-size: 2.2rem;
+            line-height: 1;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .promo-btn:hover {
+            border-color: var(--text-accent);
+            background: #3e3a36;
+            transform: translateY(-2px);
+        }
+
+        /* Адаптивность для смартфонов (Mobile Portrait) */
+        @media (max-width: 880px) {
+            body {
+                padding: 6px 4px;
+            }
+
+            .game-layout {
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .side-panel {
+                width: var(--board-size);
+                max-width: 100%;
+                padding: 12px;
+                gap: 10px;
+            }
+
+            .history-card {
+                min-height: 100px;
+                max-height: 130px;
+            }
+
+            .status-card {
+                padding: 10px 12px;
+            }
+
+            .btn {
+                padding: 9px 10px;
+                font-size: 0.88rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <span class="logo-icon">♟</span>
+                <span>Шахматы Hotseat & Бот</span>
+            </div>
+            <div class="header-actions">
+                <button class="tool-btn" id="btnFlipBoard" title="Перевернуть доску">🔄 Доска</button>
+                <button class="tool-btn" id="soundToggle" title="Звуковые эффекты">🔊 Звук: Вкл</button>
+            </div>
+        </header>
+
+        <main class="game-layout">
+            <!-- Шахматная доска и плашки игроков -->
+            <div class="board-wrapper">
+                <!-- Верхняя плашка (Черные по умолчанию, или Белые при перевороте) -->
+                <div class="player-bar" id="topPlayerBar">
+                    <div class="player-info">
+                        <span class="player-badge black" id="topPlayerBadge"></span>
+                        <span id="topPlayerName">Черные</span>
+                        <span class="player-role-tag" id="topPlayerRole">Игрок</span>
+                    </div>
+                    <div class="captured-pieces" id="topCaptured" title="Захваченные фигуры"></div>
+                </div>
+
+                <!-- Доска 8x8 -->
+                <div class="chessboard" id="chessboard"></div>
+
+                <!-- Нижняя плашка (Белые по умолчанию, или Черные при перевороте) -->
+                <div class="player-bar" id="bottomPlayerBar">
+                    <div class="player-info">
+                        <span class="player-badge white" id="bottomPlayerBadge"></span>
+                        <span id="bottomPlayerName">Белые</span>
+                        <span class="player-role-tag" id="bottomPlayerRole">Игрок</span>
+                    </div>
+                    <div class="captured-pieces" id="bottomCaptured" title="Захваченные фигуры"></div>
+                </div>
+            </div>
+
+            <!-- Боковая панель -->
+            <aside class="side-panel">
+                <!-- Настройки режима игры и бота -->
+                <div class="settings-card">
+                    <div class="settings-group">
+                        <span class="settings-label">Режим партии</span>
+                        <div class="segmented-control">
+                            <button class="seg-btn active" id="btnModeHotseat">👥 2 Игрока</button>
+                            <button class="seg-btn" id="btnModeBot">🤖 Против бота</button>
+                        </div>
+                    </div>
+
+                    <!-- Опции бота (активны только при игре с ботом) -->
+                    <div class="settings-group" id="botDifficultyGroup" style="display: none;">
+                        <span class="settings-label">Сложность бота</span>
+                        <div class="segmented-control">
+                            <button class="seg-btn" data-diff="easy" id="btnDiffEasy">🟢 Легкий</button>
+                            <button class="seg-btn active" data-diff="medium" id="btnDiffMedium">🟡 Средний</button>
+                            <button class="seg-btn" data-diff="hard" id="btnDiffHard">🔴 Сложный</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-group" id="botColorGroup" style="display: none;">
+                        <span class="settings-label">Ваш цвет</span>
+                        <div class="segmented-control">
+                            <button class="seg-btn active" data-color="w" id="btnColorWhite">⚪ Белые</button>
+                            <button class="seg-btn" data-color="b" id="btnColorBlack">⚫ Черные</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Статус партии -->
+                <div class="status-card">
+                    <div class="status-title">Статус партии</div>
+                    <div class="status-message" id="statusMessage">
+                        <span class="player-badge white" id="turnIndicator"></span>
+                        <span id="statusText">Ход белых</span>
+                    </div>
+                </div>
+
+                <!-- Кнопки управления -->
+                <div class="actions-bar">
+                    <button class="btn btn-primary" id="btnNewGame">
+                        <span>↻</span> Новая игра
+                    </button>
+                    <button class="btn btn-secondary" id="btnUndo" disabled>
+                        <span>↶</span> Отменить ход
+                    </button>
+                </div>
+
+                <!-- История ходов -->
+                <div class="history-card">
+                    <div class="history-header">История ходов</div>
+                    <div class="history-list" id="historyList">
+                        <div class="history-empty">Ходов пока нет</div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Модальное окно превращения пешки -->
+    <div class="modal-overlay" id="promotionModal">
+        <div class="modal-content">
+            <h3 class="modal-title">Превращение пешки</h3>
+            <p class="modal-body">Выберите фигуру для замены дошедшей до края пешки:</p>
+            <div class="promotion-choices" id="promotionChoices"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно завершения партии -->
+    <div class="modal-overlay" id="gameOverModal">
+        <div class="modal-content">
+            <h3 class="modal-title" id="gameOverTitle">Партия завершена</h3>
+            <p class="modal-body" id="gameOverMessage"></p>
+            <div class="actions-bar">
+                <button class="btn btn-primary" id="btnModalRestart">Начать заново</button>
+                <button class="btn btn-secondary" id="btnModalClose">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================================================
+           1. МОДЕЛЬ ДАННЫХ И СОСТОЯНИЕ ИГРЫ (STATE)
+           ========================================================================== */
+        let gameState = {
+            board: [],           // Массив 8x8, содержащий объекты фигур или null
+            turn: 'w',           // 'w' — ход белых, 'b' — ход черных
+            selectedSquare: null,// {r, c} выбранная клетка или null
+            validMoves: [],      // Массив возможных ходов для выбранной фигуры [{r, c}, ...]
+            moveHistory: [],     // История ходов в текстовом виде (e2-e4)
+            isGameOver: false,
+            statusMessage: "Ход белых"
+        };
+
+        // Состояние режима и бота
+        let gameMode = 'hotseat';     // 'hotseat' | 'bot'
+        let botDifficulty = 'medium'; // 'easy' | 'medium' | 'hard'
+        let playerColor = 'w';        // Цвет игрока при игре против бота ('w' | 'b')
+        let botColor = 'b';           // Цвет бота ('w' | 'b')
+        let isBotThinking = false;    // Флаг размышлений бота (блокирует ввод игрока)
+        let boardFlipped = false;     // Переворот доски (если игрок играет черными)
+
+        // Вспомогательное состояние
+        let historyStack = [];        // Стек снимков состояния для Undo
+        let capturedByWhite = [];     // Захваченные белыми фигуры
+        let capturedByBlack = [];     // Захваченные черными фигуры
+        let lastMove = null;          // { from: {r, c}, to: {r, c} }
+        let pendingPromotion = null;  // Данные ожидания превращения пешки человека
+
+        // Символы фигур Unicode
+        const PIECE_SYMBOLS = {
+            w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
+            b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }
+        };
+
+        // Буквы вертикалей
+        const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+
+        // Базовые ценности фигур для движка оценки
+        const PIECE_VALUES = {
+            p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000
+        };
+
+        // Позиционные таблицы клеток (Piece-Square Tables)
+        const PAWN_PST = [
+            [ 0,  0,  0,  0,  0,  0,  0,  0],
+            [50, 50, 50, 50, 50, 50, 50, 50],
+            [10, 10, 20, 30, 30, 20, 10, 10],
+            [ 5,  5, 10, 25, 25, 10,  5,  5],
+            [ 0,  0,  0, 20, 20,  0,  0,  0],
+            [ 5, -5,-10,  0,  0,-10, -5,  5],
+            [ 5, 10, 10,-20,-20, 10, 10,  5],
+            [ 0,  0,  0,  0,  0,  0,  0,  0]
+        ];
+
+        const KNIGHT_PST = [
+            [-50,-40,-30,-30,-30,-30,-40,-50],
+            [-40,-20,  0,  0,  0,  0,-20,-40],
+            [-30,  0, 10, 15, 15, 10,  0,-30],
+            [-30,  5, 15, 20, 20, 15,  5,-30],
+            [-30,  0, 15, 20, 20, 15,  0,-30],
+            [-30,  5, 10, 15, 15, 10,  5,-30],
+            [-40,-20,  0,  5,  5,  0,-20,-40],
+            [-50,-40,-30,-30,-30,-30,-40,-50]
+        ];
+
+        const BISHOP_PST = [
+            [-20,-10,-10,-10,-10,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5, 10, 10,  5,  0,-10],
+            [-10,  5,  5, 10, 10,  5,  5,-10],
+            [-10,  0, 10, 10, 10, 10,  0,-10],
+            [-10, 10, 10, 10, 10, 10, 10,-10],
+            [-10,  5,  0,  0,  0,  0,  5,-10],
+            [-20,-10,-10,-10,-10,-10,-10,-20]
+        ];
+
+        const ROOK_PST = [
+            [ 0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5, 10, 10, 10, 10, 10, 10,  5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [ 0,  0,  0,  5,  5,  0,  0,  0]
+        ];
+
+        const QUEEN_PST = [
+            [-20,-10,-10, -5, -5,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5,  5,  5,  5,  0,-10],
+            [ -5,  0,  5,  5,  5,  5,  0, -5],
+            [  0,  0,  5,  5,  5,  5,  0, -5],
+            [-10,  5,  5,  5,  5,  5,  0,-10],
+            [-10,  0,  5,  0,  0,  0,  0,-10],
+            [-20,-10,-10, -5, -5,-10,-10,-20]
+        ];
+
+        // Синтезатор звука (Web Audio API)
+        let soundEnabled = true;
+        let audioCtx = null;
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'move') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(320, now);
+                    osc.frequency.exponentialRampToValueAtTime(140, now + 0.08);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'capture') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.exponentialRampToValueAtTime(70, now + 0.12);
+                    gain.gain.setValueAtTime(0.28, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else if (type === 'check') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.setValueAtTime(800, now + 0.09);
+                    gain.gain.setValueAtTime(0.22, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+                    osc.start(now);
+                    osc.stop(now + 0.22);
+                } else if (type === 'gameover') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(420, now);
+                    osc.frequency.exponentialRampToValueAtTime(210, now + 0.35);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                }
+            } catch (e) {}
+        }
+
+        /* ==========================================================================
+           2. ИНИЦИАЛИЗАЦИЯ ДОСКИ (initBoard)
+           ========================================================================== */
+        function initBoard() {
+            gameState.board = Array(8).fill(null).map(() => Array(8).fill(null));
+
+            // Ряд 0 (Черные)
+            const backRow = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+            for (let c = 0; c < 8; c++) {
+                gameState.board[0][c] = { type: backRow[c], color: 'b' };
+                gameState.board[1][c] = { type: 'p', color: 'b' };
+                gameState.board[6][c] = { type: 'p', color: 'w' };
+                gameState.board[7][c] = { type: backRow[c], color: 'w' };
+            }
+
+            gameState.turn = 'w';
+            gameState.selectedSquare = null;
+            gameState.validMoves = [];
+            gameState.moveHistory = [];
+            gameState.isGameOver = false;
+            gameState.statusMessage = "Ход белых";
+
+            historyStack = [];
+            capturedByWhite = [];
+            capturedByBlack = [];
+            lastMove = null;
+            pendingPromotion = null;
+            isBotThinking = false;
+
+            // Если игра с ботом и игрок выбрал черных, ориентируем доску на черных
+            if (gameMode === 'bot') {
+                boardFlipped = (playerColor === 'b');
+            }
+
+            closePromotionModal();
+            closeGameOverModal();
+            render();
+
+            // Если играет бот и его очередь ходить (например, бот играет белыми)
+            checkBotTurnTrigger();
+        }
+
+        /* ==========================================================================
+           3. ВАЛИДАЦИЯ И ПРАВИЛА ХОДОВ ФИГУР (getPotentialMoves, getLegalMoves)
+           ========================================================================== */
+        function inBounds(r, c) {
+            return r >= 0 && r < 8 && c >= 0 && c < 8;
+        }
+
+        function getPotentialMoves(r, c, board = gameState.board) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const moves = [];
+            const color = piece.color;
+            const opponent = color === 'w' ? 'b' : 'w';
+
+            if (piece.type === 'p') {
+                const dir = color === 'w' ? -1 : 1;
+                const startRow = color === 'w' ? 6 : 1;
+
+                const f1 = r + dir;
+                if (inBounds(f1, c) && !board[f1][c]) {
+                    moves.push({ r: f1, c: c });
+                    const f2 = r + dir * 2;
+                    if (r === startRow && inBounds(f2, c) && !board[f2][c]) {
+                        moves.push({ r: f2, c: c });
+                    }
+                }
+
+                for (const dc of [-1, 1]) {
+                    const tr = r + dir;
+                    const tc = c + dc;
+                    if (inBounds(tr, tc) && board[tr][tc] && board[tr][tc].color === opponent) {
+                        moves.push({ r: tr, c: tc });
+                    }
+                }
+            } else if (piece.type === 'n') {
+                const deltas = [
+                    [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+                    [1, -2], [1, 2], [2, -1], [2, 1]
+                ];
+                for (const [dr, dc] of deltas) {
+                    const tr = r + dr;
+                    const tc = c + dc;
+                    if (inBounds(tr, tc)) {
+                        if (!board[tr][tc] || board[tr][tc].color === opponent) {
+                            moves.push({ r: tr, c: tc });
+                        }
+                    }
+                }
+            } else if (piece.type === 'b' || piece.type === 'r' || piece.type === 'q') {
+                const dirs = [];
+                if (piece.type === 'b' || piece.type === 'q') {
+                    dirs.push([-1, -1], [-1, 1], [1, -1], [1, 1]);
+                }
+                if (piece.type === 'r' || piece.type === 'q') {
+                    dirs.push([-1, 0], [1, 0], [0, -1], [0, 1]);
+                }
+
+                for (const [dr, dc] of dirs) {
+                    let tr = r + dr;
+                    let tc = c + dc;
+                    while (inBounds(tr, tc)) {
+                        if (!board[tr][tc]) {
+                            moves.push({ r: tr, c: tc });
+                        } else {
+                            if (board[tr][tc].color === opponent) {
+                                moves.push({ r: tr, c: tc });
+                            }
+                            break;
+                        }
+                        tr += dr;
+                        tc += dc;
+                    }
+                }
+            } else if (piece.type === 'k') {
+                const deltas = [
+                    [-1, -1], [-1, 0], [-1, 1],
+                    [0, -1],           [0, 1],
+                    [1, -1],  [1, 0],  [1, 1]
+                ];
+                for (const [dr, dc] of deltas) {
+                    const tr = r + dr;
+                    const tc = c + dc;
+                    if (inBounds(tr, tc)) {
+                        if (!board[tr][tc] || board[tr][tc].color === opponent) {
+                            moves.push({ r: tr, c: tc });
+                        }
+                    }
+                }
+            }
+
+            return moves;
+        }
+
+        function findKing(color, board = gameState.board) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (p && p.type === 'k' && p.color === color) {
+                        return { r, c };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function isSquareAttacked(targetR, targetC, attackerColor, board = gameState.board) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (p && p.color === attackerColor) {
+                        if (p.type === 'p') {
+                            const dir = attackerColor === 'w' ? -1 : 1;
+                            if (targetR === r + dir && (targetC === c - 1 || targetC === c + 1)) {
+                                return true;
+                            }
+                        } else {
+                            const potMoves = getPotentialMoves(r, c, board);
+                            if (potMoves.some(m => m.r === targetR && m.c === targetC)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function isKingInCheck(color, board = gameState.board) {
+            const king = findKing(color, board);
+            if (!king) return false;
+            const enemyColor = color === 'w' ? 'b' : 'w';
+            return isSquareAttacked(king.r, king.c, enemyColor, board);
+        }
+
+        function getLegalMoves(r, c, board = gameState.board) {
+            const piece = board[r][c];
+            if (!piece) return [];
+            const potential = getPotentialMoves(r, c, board);
+            const legal = [];
+
+            for (const move of potential) {
+                const sim = board.map(row => row.map(cell => cell ? { ...cell } : null));
+                sim[move.r][move.c] = sim[r][c];
+                sim[r][c] = null;
+
+                if (!isKingInCheck(piece.color, sim)) {
+                    legal.push(move);
+                }
+            }
+            return legal;
+        }
+
+        function hasAnyLegalMoves(color, board = gameState.board) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (p && p.color === color) {
+                        if (getLegalMoves(r, c, board).length > 0) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        /* ==========================================================================
+           4. ШАХМАТНЫЙ ИИ (БОТ) — MINIMAX, ОЦЕНКА, ДЕБЮТЫ
+           ========================================================================== */
+        function evaluateBoard(board) {
+            let score = 0;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (!p) continue;
+                    const val = PIECE_VALUES[p.type] || 0;
+                    let pst = 0;
+                    const pstRow = p.color === 'w' ? r : 7 - r;
+
+                    if (p.type === 'p') pst = PAWN_PST[pstRow][c];
+                    else if (p.type === 'n') pst = KNIGHT_PST[pstRow][c];
+                    else if (p.type === 'b') pst = BISHOP_PST[pstRow][c];
+                    else if (p.type === 'r') pst = ROOK_PST[pstRow][c];
+                    else if (p.type === 'q') pst = QUEEN_PST[pstRow][c];
+
+                    const total = val + pst;
+                    score += (p.color === 'w' ? total : -total);
+                }
+            }
+            return score;
+        }
+
+        function getAllLegalMovesForColor(color, board = gameState.board) {
+            const list = [];
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = board[r][c];
+                    if (p && p.color === color) {
+                        const moves = getLegalMoves(r, c, board);
+                        for (const m of moves) {
+                            list.push({
+                                fromR: r, fromC: c,
+                                toR: m.r, toC: m.c,
+                                piece: p,
+                                targetPiece: board[m.r][m.c]
+                            });
+                        }
+                    }
+                }
+            }
+            // Сортировка ходов: взятия вперед (MVV-LVA) для ускорения отсечения Alpha-Beta
+            list.sort((a, b) => {
+                const scoreA = a.targetPiece ? PIECE_VALUES[a.targetPiece.type] * 10 - PIECE_VALUES[a.piece.type] : 0;
+                const scoreB = b.targetPiece ? PIECE_VALUES[b.targetPiece.type] * 10 - PIECE_VALUES[b.piece.type] : 0;
+                return scoreB - scoreA;
+            });
+            return list;
+        }
+
+        function minimax(board, depth, alpha, beta, isMaximizing, bColor) {
+            const currentColor = isMaximizing ? bColor : (bColor === 'w' ? 'b' : 'w');
+            const moves = getAllLegalMovesForColor(currentColor, board);
+
+            if (moves.length === 0) {
+                if (isKingInCheck(currentColor, board)) {
+                    return isMaximizing ? -100000 - depth : 100000 + depth;
+                }
+                return 0; // Пат
+            }
+
+            if (depth === 0) {
+                const evalScore = evaluateBoard(board);
+                return bColor === 'w' ? evalScore : -evalScore;
+            }
+
+            if (isMaximizing) {
+                let maxEval = -Infinity;
+                for (const m of moves) {
+                    const sim = board.map(row => row.map(cell => cell ? { ...cell } : null));
+                    let promoType = m.piece.type;
+                    if (m.piece.type === 'p' && (m.toR === 0 || m.toR === 7)) promoType = 'q';
+                    sim[m.toR][m.toC] = { type: promoType, color: m.piece.color };
+                    sim[m.fromR][m.fromC] = null;
+
+                    const evalVal = minimax(sim, depth - 1, alpha, beta, false, bColor);
+                    maxEval = Math.max(maxEval, evalVal);
+                    alpha = Math.max(alpha, evalVal);
+                    if (beta <= alpha) break; // Бета-отсечение
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (const m of moves) {
+                    const sim = board.map(row => row.map(cell => cell ? { ...cell } : null));
+                    let promoType = m.piece.type;
+                    if (m.piece.type === 'p' && (m.toR === 0 || m.toR === 7)) promoType = 'q';
+                    sim[m.toR][m.toC] = { type: promoType, color: m.piece.color };
+                    sim[m.fromR][m.fromC] = null;
+
+                    const evalVal = minimax(sim, depth - 1, alpha, beta, true, bColor);
+                    minEval = Math.min(minEval, evalVal);
+                    beta = Math.min(beta, evalVal);
+                    if (beta <= alpha) break; // Альфа-отсечение
+                }
+                return minEval;
+            }
+        }
+
+        // Простой дебютный репертуар для мгновенного первого ответа бота
+        const OPENINGS = {
+            whiteFirst: [
+                { fromR: 6, fromC: 4, toR: 4, toC: 4 }, // e2-e4
+                { fromR: 6, fromC: 3, toR: 4, toC: 3 }, // d2-d4
+                { fromR: 7, fromC: 6, toR: 5, toC: 5 }  // g1-f3
+            ],
+            blackVsE4: [
+                { fromR: 1, fromC: 4, toR: 3, toC: 4 }, // e7-e5
+                { fromR: 1, fromC: 2, toR: 3, toC: 2 }  // c7-c5
+            ],
+            blackVsD4: [
+                { fromR: 1, fromC: 3, toR: 3, toC: 3 }, // d7-d5
+                { fromR: 0, fromC: 6, toR: 2, toC: 5 }  // g8-f6
+            ]
+        };
+
+        function getBestBotMove(bColor, diff) {
+            const moves = getAllLegalMovesForColor(bColor, gameState.board);
+            if (moves.length === 0) return null;
+
+            // Книга дебютов на первом ходу
+            if (gameState.moveHistory.length === 0 && bColor === 'w') {
+                const book = OPENINGS.whiteFirst;
+                return book[Math.floor(Math.random() * book.length)];
+            }
+            if (gameState.moveHistory.length === 1 && bColor === 'b') {
+                const firstMove = gameState.moveHistory[0];
+                if (firstMove.startsWith('e2-e4')) {
+                    const choice = OPENINGS.blackVsE4[Math.floor(Math.random() * OPENINGS.blackVsE4.length)];
+                    const found = moves.find(m => m.fromR === choice.fromR && m.fromC === choice.fromC && m.toR === choice.toR && m.toC === choice.toC);
+                    if (found) return found;
+                } else if (firstMove.startsWith('d2-d4')) {
+                    const choice = OPENINGS.blackVsD4[Math.floor(Math.random() * OPENINGS.blackVsD4.length)];
+                    const found = moves.find(m => m.fromR === choice.fromR && m.fromC === choice.fromC && m.toR === choice.toR && m.toC === choice.toC);
+                    if (found) return found;
+                }
+            }
+
+            // Легкий режим: 50% случайный ход, 50% простой тактический
+            if (diff === 'easy') {
+                if (Math.random() < 0.5) {
+                    return moves[Math.floor(Math.random() * moves.length)];
+                }
+            }
+
+            // Глубина поиска: Легкий = 1, Средний = 2, Сложный = 3
+            const depth = (diff === 'hard') ? 3 : ((diff === 'medium') ? 2 : 1);
+
+            let bestMoves = [];
+            let bestScore = -Infinity;
+
+            for (const m of moves) {
+                const sim = gameState.board.map(row => row.map(cell => cell ? { ...cell } : null));
+                let promoType = m.piece.type;
+                if (m.piece.type === 'p' && (m.toR === 0 || m.toR === 7)) promoType = 'q';
+                sim[m.toR][m.toC] = { type: promoType, color: m.piece.color };
+                sim[m.fromR][m.fromC] = null;
+
+                const score = minimax(sim, depth - 1, -Infinity, Infinity, false, bColor);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMoves = [m];
+                } else if (score === bestScore) {
+                    bestMoves.push(m);
+                }
+            }
+
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        }
+
+        function checkBotTurnTrigger() {
+            if (gameMode !== 'bot' || gameState.isGameOver) return;
+            if (gameState.turn === botColor) {
+                isBotThinking = true;
+                render();
+
+                // Небольшая задержка перед ходом бота, чтобы ход воспринимался естественно
+                setTimeout(() => {
+                    if (gameMode !== 'bot' || gameState.isGameOver || gameState.turn !== botColor) {
+                        isBotThinking = false;
+                        render();
+                        return;
+                    }
+                    const bestMove = getBestBotMove(botColor, botDifficulty);
+                    isBotThinking = false;
+                    if (bestMove) {
+                        executeMove(bestMove.fromR, bestMove.fromC, bestMove.toR, bestMove.toC, 'q');
+                    } else {
+                        render();
+                    }
+                }, 380);
+            }
+        }
+
+        /* ==========================================================================
+           5. ОБРАБОТКА ХОДОВ И КЛИКОВ (handleSquareClick, executeMove)
+           ========================================================================== */
+        function formatSquare(r, c) {
+            return FILES[c] + (8 - r);
+        }
+
+        function handleSquareClick(r, c) {
+            if (gameState.isGameOver || pendingPromotion || isBotThinking) return;
+
+            // Если игра с ботом, игрок может ходить только фигурами своего цвета
+            if (gameMode === 'bot' && gameState.turn !== playerColor) return;
+
+            const clickedPiece = gameState.board[r][c];
+
+            // 1. Фигура еще не выбрана
+            if (gameState.selectedSquare === null) {
+                if (clickedPiece && clickedPiece.color === gameState.turn) {
+                    gameState.selectedSquare = { r, c };
+                    gameState.validMoves = getLegalMoves(r, c);
+                    render();
+                }
+                return;
+            }
+
+            const sel = gameState.selectedSquare;
+
+            // 2. Клик по той же клетке -> отмена выбора
+            if (sel.r === r && sel.c === c) {
+                gameState.selectedSquare = null;
+                gameState.validMoves = [];
+                render();
+                return;
+            }
+
+            // 3. Клик по другой своей фигуре -> перевыбор
+            if (clickedPiece && clickedPiece.color === gameState.turn) {
+                gameState.selectedSquare = { r, c };
+                gameState.validMoves = getLegalMoves(r, c);
+                render();
+                return;
+            }
+
+            // 4. Проверка клика по одной из клеток из validMoves
+            const move = gameState.validMoves.find(m => m.r === r && m.c === c);
+            if (move) {
+                executeMove(sel.r, sel.c, r, c);
+            }
+        }
+
+        function executeMove(fromR, fromC, toR, toC, promoteTo = null) {
+            const piece = gameState.board[fromR][fromC];
+            const targetPiece = gameState.board[toR][toC];
+
+            // Проверка превращения пешки
+            const isPawnPromotion = (piece.type === 'p' && (toR === 0 || toR === 7));
+            if (isPawnPromotion && !promoteTo) {
+                // Если ходит человек — открываем выбор фигуры
+                pendingPromotion = { fromR, fromC, toR, toC };
+                openPromotionModal(piece.color);
+                return;
+            }
+
+            // Сохраняем состояние для отмены (Undo)
+            saveStateToHistory();
+
+            // Взятие фигуры
+            let isCapture = false;
+            if (targetPiece) {
+                isCapture = true;
+                if (gameState.turn === 'w') {
+                    capturedByWhite.push(targetPiece);
+                } else {
+                    capturedByBlack.push(targetPiece);
+                }
+            }
+
+            // Перемещение фигуры на доске
+            gameState.board[toR][toC] = {
+                type: promoteTo || piece.type,
+                color: piece.color
+            };
+            gameState.board[fromR][fromC] = null;
+
+            // Нотация хода
+            const moveNotation = formatSquare(fromR, fromC) + (isCapture ? ':' : '-') + formatSquare(toR, toC);
+            gameState.moveHistory.push(moveNotation);
+
+            lastMove = { from: { r: fromR, c: fromC }, to: { r: toR, c: toC } };
+
+            // Смена очереди хода
+            gameState.turn = gameState.turn === 'w' ? 'b' : 'w';
+            gameState.selectedSquare = null;
+            gameState.validMoves = [];
+
+            // Проверка условий Шаха / Мата / Пата
+            const inCheck = isKingInCheck(gameState.turn);
+            const hasMoves = hasAnyLegalMoves(gameState.turn);
+
+            if (!hasMoves) {
+                gameState.isGameOver = true;
+                if (inCheck) {
+                    const winner = gameState.turn === 'w' ? 'Черные' : 'Белые';
+                    gameState.statusMessage = `Мат! Победили ${winner}!`;
+                    playSound('gameover');
+                    const winnerDesc = (gameMode === 'bot')
+                        ? (gameState.turn === playerColor ? 'Победил Бот! Попробуйте еще раз.' : 'Поздравляем! Вы победили бота! 🎉')
+                        : `Победу одержали ${winner}. Отличная партия!`;
+                    openGameOverModal(`Шах и мат! 🏆`, winnerDesc);
+                } else {
+                    gameState.statusMessage = 'Ничья! Пат.';
+                    playSound('gameover');
+                    openGameOverModal('Ничья (Пат) 🤝', 'У игрока нет доступных ходов, и король не под шахом.');
+                }
+            } else {
+                if (inCheck) {
+                    const victim = gameState.turn === 'w' ? 'белому' : 'черному';
+                    gameState.statusMessage = `Шах ${victim} королю!`;
+                    playSound('check');
+                } else {
+                    gameState.statusMessage = gameState.turn === 'w' ? 'Ход белых' : 'Ход черных';
+                    playSound(isCapture ? 'capture' : 'move');
+                }
+            }
+
+            render();
+
+            // Проверяем, нужно ли ходить боту
+            if (!gameState.isGameOver) {
+                checkBotTurnTrigger();
+            }
+        }
+
+        /* ==========================================================================
+           6. УПРАВЛЕНИЕ ИСТОРИЕЙ И ОТМЕНА ХОДА (Undo)
+           ========================================================================== */
+        function saveStateToHistory() {
+            historyStack.push({
+                board: gameState.board.map(row => row.map(cell => cell ? { ...cell } : null)),
+                turn: gameState.turn,
+                moveHistory: [...gameState.moveHistory],
+                statusMessage: gameState.statusMessage,
+                isGameOver: gameState.isGameOver,
+                capturedByWhite: [...capturedByWhite],
+                capturedByBlack: [...capturedByBlack],
+                lastMove: lastMove ? { from: { ...lastMove.from }, to: { ...lastMove.to } } : null
+            });
+        }
+
+        function restoreState(prev) {
+            gameState.board = prev.board;
+            gameState.turn = prev.turn;
+            gameState.selectedSquare = null;
+            gameState.validMoves = [];
+            gameState.moveHistory = prev.moveHistory;
+            gameState.statusMessage = prev.statusMessage;
+            gameState.isGameOver = prev.isGameOver;
+
+            capturedByWhite = prev.capturedByWhite;
+            capturedByBlack = prev.capturedByBlack;
+            lastMove = prev.lastMove;
+            pendingPromotion = null;
+            isBotThinking = false;
+        }
+
+        function undoMove() {
+            if (historyStack.length === 0 || isBotThinking) return;
+
+            // Если играем против бота и ход игрока, отменяем 2 полухода (ход бота и ход игрока)
+            if (gameMode === 'bot' && gameState.turn === playerColor && historyStack.length >= 2) {
+                historyStack.pop(); // сброс хода бота
+                const prev = historyStack.pop(); // возврат к позиции перед ходом игрока
+                restoreState(prev);
+            } else {
+                const prev = historyStack.pop();
+                restoreState(prev);
+            }
+
+            closePromotionModal();
+            closeGameOverModal();
+            playSound('move');
+            render();
+        }
+
+        /* ==========================================================================
+           7. МОДАЛЬНЫЕ ОКНА
+           ========================================================================== */
+        const promoModal = document.getElementById('promotionModal');
+        const promoChoices = document.getElementById('promotionChoices');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const gameOverTitle = document.getElementById('gameOverTitle');
+        const gameOverMessage = document.getElementById('gameOverMessage');
+
+        function openPromotionModal(color) {
+            promoChoices.innerHTML = '';
+            const choices = ['q', 'r', 'b', 'n'];
+
+            choices.forEach(type => {
+                const btn = document.createElement('button');
+                btn.className = `promo-btn piece ${color === 'w' ? 'white-piece' : 'black-piece'}`;
+                btn.textContent = PIECE_SYMBOLS[color][type];
+                btn.onclick = () => {
+                    closePromotionModal();
+                    if (pendingPromotion) {
+                        const { fromR, fromC, toR, toC } = pendingPromotion;
+                        pendingPromotion = null;
+                        executeMove(fromR, fromC, toR, toC, type);
+                    }
+                };
+                promoChoices.appendChild(btn);
+            });
+
+            promoModal.classList.add('active');
+        }
+
+        function closePromotionModal() {
+            promoModal.classList.remove('active');
+        }
+
+        function openGameOverModal(title, msg) {
+            gameOverTitle.textContent = title;
+            gameOverMessage.textContent = msg;
+            gameOverModal.classList.add('active');
+        }
+
+        function closeGameOverModal() {
+            gameOverModal.classList.remove('active');
+        }
+
+        /* ==========================================================================
+           8. ОТРИСОВКА ИНТЕРФЕЙСА (render)
+           ========================================================================== */
+        const boardEl = document.getElementById('chessboard');
+        const statusTextEl = document.getElementById('statusText');
+        const turnIndicatorEl = document.getElementById('turnIndicator');
+        const btnUndoEl = document.getElementById('btnUndo');
+        const historyListEl = document.getElementById('historyList');
+
+        const topPlayerBarEl = document.getElementById('topPlayerBar');
+        const bottomPlayerBarEl = document.getElementById('bottomPlayerBar');
+        const topPlayerNameEl = document.getElementById('topPlayerName');
+        const bottomPlayerNameEl = document.getElementById('bottomPlayerName');
+        const topPlayerRoleEl = document.getElementById('topPlayerRole');
+        const bottomPlayerRoleEl = document.getElementById('bottomPlayerRole');
+        const topPlayerBadgeEl = document.getElementById('topPlayerBadge');
+        const bottomPlayerBadgeEl = document.getElementById('bottomPlayerBadge');
+        const topCapturedEl = document.getElementById('topCaptured');
+        const bottomCapturedEl = document.getElementById('bottomCaptured');
+
+        function render() {
+            boardEl.innerHTML = '';
+            boardEl.classList.toggle('thinking', isBotThinking);
+
+            const kingInCheck = isKingInCheck(gameState.turn);
+            const kingPos = kingInCheck ? findKing(gameState.turn) : null;
+
+            // Определяем цвета верхнего и нижнего игрока на экране в зависимости от boardFlipped
+            const topColor = boardFlipped ? 'w' : 'b';
+            const bottomColor = boardFlipped ? 'b' : 'w';
+
+            // Обновляем плашки игроков
+            topPlayerBadgeEl.className = `player-badge ${topColor === 'w' ? 'white' : 'black'}`;
+            bottomPlayerBadgeEl.className = `player-badge ${bottomColor === 'w' ? 'white' : 'black'}`;
+
+            if (gameMode === 'bot') {
+                if (topColor === botColor) {
+                    topPlayerNameEl.textContent = `Бот (${topColor === 'w' ? 'Белые' : 'Черные'})`;
+                    topPlayerRoleEl.textContent = `🤖 ${botDifficulty.toUpperCase()}`;
+                } else {
+                    topPlayerNameEl.textContent = `Вы (${topColor === 'w' ? 'Белые' : 'Черные'})`;
+                    topPlayerRoleEl.textContent = `👤 Игрок`;
+                }
+
+                if (bottomColor === botColor) {
+                    bottomPlayerNameEl.textContent = `Бот (${bottomColor === 'w' ? 'Белые' : 'Черные'})`;
+                    bottomPlayerRoleEl.textContent = `🤖 ${botDifficulty.toUpperCase()}`;
+                } else {
+                    bottomPlayerNameEl.textContent = `Вы (${bottomColor === 'w' ? 'Белые' : 'Черные'})`;
+                    bottomPlayerRoleEl.textContent = `👤 Игрок`;
+                }
+            } else {
+                topPlayerNameEl.textContent = topColor === 'w' ? 'Белые' : 'Черные';
+                topPlayerRoleEl.textContent = 'Игрок 2';
+                bottomPlayerNameEl.textContent = bottomColor === 'w' ? 'Белые' : 'Черные';
+                bottomPlayerRoleEl.textContent = 'Игрок 1';
+            }
+
+            topPlayerBarEl.classList.toggle('active-turn', gameState.turn === topColor);
+            bottomPlayerBarEl.classList.toggle('active-turn', gameState.turn === bottomColor);
+
+            // Отображение захваченных фигур на соответствующих плашках
+            const whiteCapsStr = capturedByWhite.map(p => PIECE_SYMBOLS[p.color][p.type]).join(' ');
+            const blackCapsStr = capturedByBlack.map(p => PIECE_SYMBOLS[p.color][p.type]).join(' ');
+
+            if (topColor === 'w') {
+                topCapturedEl.textContent = whiteCapsStr;
+                bottomCapturedEl.textContent = blackCapsStr;
+            } else {
+                topCapturedEl.textContent = blackCapsStr;
+                bottomCapturedEl.textContent = whiteCapsStr;
+            }
+
+            // Рендерим 64 клетки (с учетом переворота boardFlipped)
+            for (let rIdx = 0; rIdx < 8; rIdx++) {
+                for (let cIdx = 0; cIdx < 8; cIdx++) {
+                    const r = boardFlipped ? (7 - rIdx) : rIdx;
+                    const c = boardFlipped ? (7 - cIdx) : cIdx;
+
+                    const squareEl = document.createElement('div');
+                    squareEl.className = 'square';
+                    squareEl.dataset.row = r;
+                    squareEl.dataset.col = c;
+
+                    const isLight = (r + c) % 2 === 0;
+                    squareEl.classList.add(isLight ? 'light' : 'dark');
+
+                    if (gameState.selectedSquare && gameState.selectedSquare.r === r && gameState.selectedSquare.c === c) {
+                        squareEl.classList.add('selected');
+                    }
+
+                    if (lastMove && (
+                        (lastMove.from.r === r && lastMove.from.c === c) ||
+                        (lastMove.to.r === r && lastMove.to.c === c)
+                    )) {
+                        squareEl.classList.add('last-move');
+                    }
+
+                    if (kingPos && kingPos.r === r && kingPos.c === c) {
+                        squareEl.classList.add('check');
+                    }
+
+                    const isValid = gameState.validMoves.some(m => m.r === r && m.c === c);
+                    if (isValid) {
+                        if (gameState.board[r][c]) {
+                            squareEl.classList.add('valid-capture');
+                        } else {
+                            squareEl.classList.add('valid-move');
+                        }
+                    }
+
+                    // Оцифровка координат
+                    if (cIdx === 0) {
+                        const rankLabel = document.createElement('span');
+                        rankLabel.className = 'coord-rank';
+                        rankLabel.textContent = 8 - r;
+                        squareEl.appendChild(rankLabel);
+                    }
+                    if (rIdx === 7) {
+                        const fileLabel = document.createElement('span');
+                        fileLabel.className = 'coord-file';
+                        fileLabel.textContent = FILES[c];
+                        squareEl.appendChild(fileLabel);
+                    }
+
+                    // Фигура
+                    const piece = gameState.board[r][c];
+                    if (piece) {
+                        const pieceEl = document.createElement('div');
+                        pieceEl.className = `piece ${piece.color === 'w' ? 'white-piece' : 'black-piece'}`;
+                        pieceEl.textContent = PIECE_SYMBOLS[piece.color][piece.type];
+                        squareEl.appendChild(pieceEl);
+                    }
+
+                    squareEl.addEventListener('click', () => handleSquareClick(r, c));
+                    boardEl.appendChild(squareEl);
+                }
+            }
+
+            // Статус партии
+            if (isBotThinking) {
+                statusTextEl.innerHTML = '<span class="bot-thinking-spinner">⏳</span> Бот думает...';
+            } else {
+                statusTextEl.textContent = gameState.statusMessage;
+            }
+            turnIndicatorEl.className = `player-badge ${gameState.turn === 'w' ? 'white' : 'black'}`;
+
+            // Кнопка отмены хода
+            btnUndoEl.disabled = (historyStack.length === 0 || gameState.isGameOver || isBotThinking);
+
+            // История ходов
+            renderHistory();
+        }
+
+        function renderHistory() {
+            if (gameState.moveHistory.length === 0) {
+                historyListEl.innerHTML = '<div class="history-empty">Ходов пока нет</div>';
+                return;
+            }
+
+            historyListEl.innerHTML = '';
+            const totalTurns = Math.ceil(gameState.moveHistory.length / 2);
+
+            for (let i = 0; i < totalTurns; i++) {
+                const row = document.createElement('div');
+                row.className = 'history-row';
+
+                const whiteMove = gameState.moveHistory[i * 2] || '';
+                const blackMove = gameState.moveHistory[i * 2 + 1] || '';
+
+                row.innerHTML = `
+                    <span class="history-num">${i + 1}.</span>
+                    <span class="history-move">${whiteMove}</span>
+                    <span class="history-move ${!blackMove ? 'empty' : ''}">${blackMove || '...'}</span>
+                `;
+                historyListEl.appendChild(row);
+            }
+
+            historyListEl.scrollTop = historyListEl.scrollHeight;
+        }
+
+        /* ==========================================================================
+           9. СЛУШАТЕЛИ СОБЫТИЙ И УПРАВЛЕНИЕ
+           ========================================================================== */
+        document.getElementById('btnNewGame').addEventListener('click', () => {
+            initBoard();
+        });
+
+        document.getElementById('btnUndo').addEventListener('click', () => {
+            undoMove();
+        });
+
+        document.getElementById('btnModalRestart').addEventListener('click', () => {
+            initBoard();
+        });
+
+        document.getElementById('btnModalClose').addEventListener('click', () => {
+            closeGameOverModal();
+        });
+
+        // Переворот доски
+        document.getElementById('btnFlipBoard').addEventListener('click', () => {
+            boardFlipped = !boardFlipped;
+            render();
+        });
+
+        // Переключение режимов Hotseat / Бот
+        const btnModeHotseat = document.getElementById('btnModeHotseat');
+        const btnModeBot = document.getElementById('btnModeBot');
+        const botDiffGroup = document.getElementById('botDifficultyGroup');
+        const botColorGroup = document.getElementById('botColorGroup');
+
+        btnModeHotseat.addEventListener('click', () => {
+            if (gameMode === 'hotseat') return;
+            gameMode = 'hotseat';
+            btnModeHotseat.classList.add('active');
+            btnModeBot.classList.remove('active');
+            botDiffGroup.style.display = 'none';
+            botColorGroup.style.display = 'none';
+            boardFlipped = false;
+            initBoard();
+        });
+
+        btnModeBot.addEventListener('click', () => {
+            if (gameMode === 'bot') return;
+            gameMode = 'bot';
+            btnModeBot.classList.add('active');
+            btnModeHotseat.classList.remove('active');
+            botDiffGroup.style.display = 'flex';
+            botColorGroup.style.display = 'flex';
+            initBoard();
+        });
+
+        // Выбор сложности бота
+        const diffButtons = document.querySelectorAll('#botDifficultyGroup .seg-btn');
+        diffButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                diffButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                botDifficulty = btn.dataset.diff;
+                render();
+            });
+        });
+
+        // Выбор цвета игрока против бота
+        const colorButtons = document.querySelectorAll('#botColorGroup .seg-btn');
+        colorButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                colorButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                playerColor = btn.dataset.color;
+                botColor = (playerColor === 'w') ? 'b' : 'w';
+                boardFlipped = (playerColor === 'b');
+                initBoard();
+            });
+        });
+
+        // Звук
+        const soundToggleBtn = document.getElementById('soundToggle');
+        soundToggleBtn.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundToggleBtn.textContent = soundEnabled ? '🔊 Звук: Вкл' : '🔇 Звук: Выкл';
+            if (soundEnabled) playSound('move');
+        });
+
+        // Старт игры
+        initBoard();
+    </script>
+</body>
+</html>
